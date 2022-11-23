@@ -1,0 +1,225 @@
+#include "Parser.h"
+
+
+void printVector3(vector<string> v) {
+	for(int i = 0; i < v.size(); i++) {
+		cout << " j: " << i << " " << v[i];
+	}
+	
+	cout << endl;
+}
+
+// Retentrant variables
+int strTokPos = 0;
+string currStr = "";
+
+string Parser::myStrTok(string str, char delim) {
+	string returnStr = "";
+	
+	// Check for change in the current string
+	if (currStr.compare(str) != 0) {
+		strTokPos = 0;
+		currStr = str;
+	}
+	
+	// Check for end of string
+	if (str.length() - 2 <= strTokPos) {
+		return "";
+	}
+	
+	int oldPos = strTokPos;
+	while (strTokPos < str.length() && 
+		   str[strTokPos] != '\0' &&
+		   str[strTokPos] != delim) {
+		strTokPos++;
+		if (strTokPos > 1000) {cout << "TOO LONG" << endl; break;}
+	}
+	
+	returnStr = str.substr(oldPos, strTokPos - oldPos);
+	//cout << "old: " << oldPos << " newPos: " << strTokPos << " ";
+	if (str[strTokPos] == delim)
+		strTokPos++;
+	
+	return returnStr;
+}
+
+
+void trim(string& s) {
+	for(int i = 0; i < s.length(); i++) {
+		if (s[i] != ' ') {
+			s = s.substr(i, s.length() - i);
+			break;
+		}
+	}
+	
+	for(int i = s.length()-1; i > 0; i--) {
+		if (s[i] != ' ' && s[i] != '\n' && s[i] != '\r') {
+			s = s.substr(0, i+1);
+			break;
+		}
+	}
+}
+
+bool contains(vector<string> v, string s) {
+	for(int i = 0; i < v.size(); i++) {
+		if (v[i].compare(s) == 0)
+			return true;
+	}
+	
+	return false;
+	
+}
+
+
+Parser::Parser(string filePath) {
+	if (getFile(filePath) == "ERR: NO FILE") {exit(0);}	
+	parseLines();
+	parseExamples();
+	parseAttributesList();
+	
+}
+
+
+string Parser::getFile(string filePath) {
+	
+	ifstream inFile;
+	inFile.open(filePath);
+	if (!inFile.is_open()) {
+		cout << "ERROR :" << filePath << " DOES NOT EXIST" << endl;
+		return "ERR: NO FILE";
+	}
+	
+	string line;
+	string returnString = "";
+	while (getline(inFile, line)) {
+		returnString += line + ",\n";
+	}
+	
+	this->fileStr = returnString;
+	
+	inFile.close();
+	return returnString;
+}
+
+
+vector <vector <string>> Parser::getAttributesList() {
+	if (this->attributesList[0][0].compare("DEFAULT") == 0) {
+		parseAttributesList();
+	}
+	cout << endl << "Attributes Types: " << endl << endl;
+	for(int i = 0; i < attributesList.size(); i++) {
+		cout << i << ":";
+		for(int j = 0; j < attributesList[i].size(); j++) {
+			cout << " " << attributesList[i][j];
+		}
+		cout << endl;
+	}
+	cout << endl;
+	
+	return this->attributesList;
+	
+}
+
+
+void Parser::parseLines() {
+	if (this->lines[0].compare("DEFAULT") != 0) {
+		return;
+	}
+	this->lines.erase(this->lines.begin());
+	string line = myStrTok(fileStr, '\n');
+	
+	while (line.compare("") != 0) {
+		this->lines.push_back(line);
+		line = myStrTok(fileStr, '\n');
+	}
+	
+}
+
+void Parser::parseAttributesList() {
+	
+	for(int i = 0; i < this->lines.size(); i++) {
+		parseAttributesLine(this->lines[i]);
+	}
+}
+
+void Parser::parseAttributesLine(string line) {
+	int i = -1;
+	string attribute = myStrTok(line, ',');
+	trim(attribute);
+	
+	while (attribute.compare("") != 0) {
+		i++;
+		if (attributesList[0][0].compare("DEFAULT") == 0) {
+			attributesList[0][0] = attribute;
+			attribute = myStrTok(line, ',');
+			trim(attribute);
+			continue;
+		} 
+		if (attributesList.size() - 1 < i) {
+			attributesList.push_back({attribute});
+			attribute = myStrTok(line, ',');
+			trim(attribute);
+			continue;
+		}
+		if (!contains(this->attributesList[i], attribute)) {
+			attributesList[i].push_back(attribute);
+		}
+		attribute = myStrTok(line, ',');
+		trim(attribute);
+	}
+	
+}
+
+void Parser::parseExamples() {
+	
+	if (this->exampleList[0][0].compare("DEFAULT") == 0) {
+		this->exampleList.erase(exampleList.begin());
+	}
+	
+	if (this->lines[0].compare("DEFAULT") == 0) {
+		parseLines();
+	}
+	
+	for(int i = 0; i < this->lines.size(); i++) {
+		this->exampleList.push_back(exampleToAttribVector(lines[i]));
+	}
+}
+
+vector <vector <string>> Parser::getExamples() {
+	if (exampleList[0][0].compare("DEFAULT") == 0) {
+		parseExamples();
+	}
+	return this->exampleList;
+}
+
+vector<string> Parser::exampleToAttribVector(string line) {
+	
+	vector<string> returnVector;
+	int i = 0;
+	string attribute = getNthAttrib(line,i);
+	i++;
+	while(attribute.compare("") != 0) {
+		returnVector.push_back(attribute);
+		attribute = getNthAttrib(line,i);
+		i++;
+		
+	}
+	return returnVector;
+}
+
+string Parser::getNthAttrib(string dataPt, int i) {
+	
+	int j = -1;
+	string attribute = myStrTok(dataPt, ',');
+	
+	trim(attribute);
+	j++;
+	while (j < i && attribute != "") {
+		attribute = myStrTok(dataPt, ',');
+		trim(attribute);
+		j++;
+	}
+	myStrTok("",' ');
+	return attribute;
+	
+}
